@@ -1,3 +1,5 @@
+var assert = require('assert');
+
 var Base   = require('../../lib/reporters/base')
   , Assert = require('assert').AssertionError;
 
@@ -88,24 +90,27 @@ describe('Base reporter', function () {
 
   });
 
-  it('should show string diff as raw data', function () {
-    var err = new Error('test'),
-      errOut;
+  describe('Getting two strings', function() {
+    // Fix regression V1.2.1(see: issue #1241)
+    it('should show strings diff as is', function () {
+      var err = new Error('test'),
+        errOut;
 
-    err.actual = 'foo\nbar';
-    err.expected = 'foo\nbaz';
-    err.showDiff = true;
-    var test = makeTest(err);
+      err.actual = 'foo\nbar';
+      err.expected = 'foo\nbaz';
+      err.showDiff = true;
+      var test = makeTest(err);
 
-    Base.list([test]);
+      Base.list([test]);
 
-    errOut = stdout.join('\n');
+      errOut = stdout.join('\n');
 
-    errOut.should.match(/"foo\\nbar"/);
-    errOut.should.match(/"foo\\nbaz"/);
-    errOut.should.match(/test/);
-    errOut.should.match(/actual/);
-    errOut.should.match(/expected/);
+      errOut.should.not.match(/"foo\\nbar"/);
+      errOut.should.match(/foo/).and.match(/bar/);
+      errOut.should.match(/test/);
+      errOut.should.match(/actual/);
+      errOut.should.match(/expected/);
+    });
   });
 
   it('should stringify objects', function () {
@@ -126,6 +131,47 @@ describe('Base reporter', function () {
     errOut.should.match(/\+ expected/);
   });
 
+  it('should stringify Object.create(null)', function () {
+    var err = new Error('test'),
+      errOut;
+
+    err.actual = Object.create(null);
+    err.actual.hasOwnProperty = 1;
+    err.expected = Object.create(null);
+    err.expected.hasOwnProperty = 2;
+    err.showDiff = true;
+    var test = makeTest(err);
+
+    Base.list([test]);
+
+    errOut = stdout.join('\n');
+    errOut.should.match(/"hasOwnProperty"/);
+    errOut.should.match(/test/);
+    errOut.should.match(/\- actual/);
+    errOut.should.match(/\+ expected/);
+  });
+
+  it('should handle error messages that are not strings', function () {
+    var errOut;
+
+    try {
+      assert(false, true);
+    } catch (err) {
+      err.actual = false;
+      err.expected = true;
+      err.showDiff = true;
+      var test = makeTest(err);
+
+      Base.list([test]);
+
+      errOut = stdout.join('\n');
+      errOut.should.match(/\+true/);
+      errOut.should.match(/\-false/);
+      errOut.should.match(/\- actual/);
+      errOut.should.match(/\+ expected/);
+    }
+  });
+
   it('should remove message from stack', function () {
     var err = {
       message: 'Error',
@@ -137,7 +183,18 @@ describe('Base reporter', function () {
     Base.list([test]);
 
     var errOut = stdout.join('\n').trim();
-    errOut.should.equal('1) test title:\n     Error\n  foo\n  bar')
+    errOut.should.equal('1) test title:\n     Error\n  foo\n  bar');
+  });
+
+  it('should use the inspect() property if `message` is not set', function () {
+    var err = {
+      showDiff: false,
+      inspect: function() { return 'an error happened'; },
+    };
+    var test = makeTest(err);
+    Base.list([test]);
+    var errOut = stdout.join('\n').trim();
+    errOut.should.equal('1) test title:\n     an error happened');
   });
 
   it('should not modify stack if it does not contain message', function () {
@@ -151,7 +208,7 @@ describe('Base reporter', function () {
     Base.list([test]);
 
     var errOut = stdout.join('\n').trim();
-    errOut.should.equal('1) test title:\n     Error\n  foo\n  bar')
+    errOut.should.equal('1) test title:\n     Error\n  foo\n  bar');
   });
 
 });

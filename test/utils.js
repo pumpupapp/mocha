@@ -56,9 +56,9 @@ describe('utils', function() {
     var parseQuery = utils.parseQuery;
     it('should get queryString and return key-value object', function() {
       parseQuery('?foo=1&bar=2&baz=3').should.eql({
-        foo: 1,
-        bar: 2,
-        baz: 3
+        foo: '1',
+        bar: '2',
+        baz: '3'
       });
 
       parseQuery('?r1=^@(?!.*\\)$)&r2=m{2}&r3=^co.*').should.eql({
@@ -97,10 +97,11 @@ describe('utils', function() {
           , 'next (/usr/local/lib/node_modules/mocha/lib/runner.js:248:23)'
           , 'Immediate._onImmediate (/usr/local/lib/node_modules/mocha/lib/runner.js:276:5)'
           , 'at processImmediate [as _immediateCallback] (timers.js:321:17)'];
-        filter(stack.join('\n')).should.equal(stack.slice(0,2).concat(stack.slice(5,7)).join('\n'));
+
+        filter(stack.join('\n')).should.equal(stack.slice(0,7).join('\n'));
       });
 
-      it('should ignore bower and components files', function() {
+      it('does not ignore other bower_components and components', function() {
         var stack = ['Error: failed'
           , 'at assert (index.html:11:26)'
           , 'at Context.<anonymous> (test.js:17:18)'
@@ -116,6 +117,18 @@ describe('utils', function() {
           , 'at next (file:///.../components/mochajs/mocha/2.1.0/mocha.js:4817:14)'];
         filter(stack.join('\n')).should.equal(stack.slice(0,7).join('\n'));
       });
+
+      it('should replace absolute with relative paths', function() {
+        var stack = ['Error: ' + process.cwd() + '/bla.js has a problem'
+          , 'at foo (' + process.cwd() + '/foo/index.js:13:226)'
+          , 'at bar (/usr/local/dev/own/tmp/node_modules/bluebird/js/main/promise.js:11:26)'];
+
+        var expected = ['Error: ' + process.cwd() + '/bla.js has a problem'
+          , 'at foo (foo/index.js:13:226)'
+          , 'at bar (/usr/local/dev/own/tmp/node_modules/bluebird/js/main/promise.js:11:26)'];
+
+        filter(stack.join('\n')).should.equal(expected.join('\n'));
+      });
     });
 
     describe('on browser', function() {
@@ -125,18 +138,18 @@ describe('utils', function() {
         global.location = { href: 'localhost:3000/foo/bar/index.html' };
         filter = utils.stackTraceFilter();
       });
-      it('should strip out bower and components too', function() {
+      it('does not strip out other bower_components and components', function() {
         var stack = ['Error: failed'
           , 'at assert (index.html:11:26)'
           , 'at Context.<anonymous> (test.js:17:18)'
           , 'at bower_components/should/should.js:4827:7'
-          , 'at next (localhost:3000/foo/bar/bower_components/should/should.js:4766:23)'
+          , 'at next (bower_components/should/should.js:4766:23)'
           , 'at components/should/5.0.0/should.js:4827:7'
-          , 'at next (localhost:3000/foo/bar/components/should/5.0.0/should.js:4766:23)'
-          , 'at Runner.require.register.Runner.runTest (localhost:3000/foo/bar/node_modules/mocha.js:4892:10)'
+          , 'at next (components/should/5.0.0/should.js:4766:23)'
+          , 'at Runner.require.register.Runner.runTest (node_modules/mocha.js:4892:10)'
           , 'at localhost:3000/foo/bar/node_modules/mocha.js:4970:12'
-          , 'at next (localhost:3000/foo/bar/node_modules/mocha.js:4817:14)'];
-        filter(stack.join('\n')).should.equal(stack.slice(0,3).join('\n'));
+          , 'at next (node_modules/mocha.js:4817:14)'];
+        filter(stack.join('\n')).should.equal(stack.slice(0,7).join('\n'));
       });
 
       after(function() {

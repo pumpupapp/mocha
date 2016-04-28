@@ -114,7 +114,7 @@ describe('Runner', function(){
     it ('should not fail when a new common global is introduced', function(){
       // verify that the prop isn't enumerable
       delete global.XMLHttpRequest;
-      global.propertyIsEnumerable('XMLHttpRequest').should.not.be.ok;
+      global.propertyIsEnumerable('XMLHttpRequest').should.not.be.ok();
 
       // create a new runner and keep a reference to the test.
       var test = new Test('im a test about bears');
@@ -123,7 +123,7 @@ describe('Runner', function(){
 
       // make the prop enumerable again.
       global.XMLHttpRequest = function() {};
-      global.propertyIsEnumerable('XMLHttpRequest').should.be.ok;
+      global.propertyIsEnumerable('XMLHttpRequest').should.be.ok();
 
       // verify the test hasn't failed.
       newRunner.checkGlobals(test);
@@ -229,8 +229,17 @@ describe('Runner', function(){
       runner.fail(test, err);
     })
 
-    it('should emit a the error when failed with an Error', function(done){
+    it('should emit a the error when failed with an Error instance', function(done){
       var test = {}, err = new Error('an error message');
+      runner.on('fail', function(test, err){
+        err.message.should.equal('an error message');
+        done();
+      });
+      runner.fail(test, err);
+    })
+
+    it('should emit the error when failed with an Error-like object', function(done){
+      var test = {}, err = {message: 'an error message'};
       runner.on('fail', function(test, err){
         err.message.should.equal('an error message');
         done();
@@ -266,6 +275,19 @@ describe('Runner', function(){
       runner.failures.should.equal(2);
     })
 
+    it('should augment hook title with current test title', function(){
+      var hook = {
+        title: '"before each" hook',
+        ctx: { currentTest: new Test('should behave') }
+      };
+      runner.failHook(hook, {});
+      hook.title.should.equal('"before each" hook for "should behave"');
+
+      hook.ctx.currentTest = new Test('should obey');
+      runner.failHook(hook, {});
+      hook.title.should.equal('"before each" hook for "should obey"');
+    })
+
     it('should emit "fail"', function(done){
       var hook = {}, err = {};
       runner.on('fail', function(hook, err){
@@ -290,6 +312,21 @@ describe('Runner', function(){
       runner.failHook(hook, err);
       done();
     })
+  });
+
+  describe('allowUncaught', function() {
+    it('should allow unhandled errors to propagate through', function(done) {
+      var newRunner = new Runner(suite);
+      newRunner.allowUncaught = true;
+      newRunner.test = new Test('failing test', function() {
+        throw new Error('allow unhandled errors');
+      });
+      function fail() {
+        newRunner.runTest();
+      }
+      fail.should.throw('allow unhandled errors');
+      done();
+    });
   });
 
   describe('stackTrace', function() {
